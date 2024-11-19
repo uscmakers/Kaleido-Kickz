@@ -43,6 +43,30 @@
 	  URL.revokeObjectURL(url);
 	}
   
+	function handleSendToFlask() {
+	  // Send G-code to Flask app
+	  const formData = new FormData();
+	  const blob = new Blob([gcode], { type: 'text/plain' });
+	  formData.append('file', blob, 'drawing.gcode');
+  
+	  fetch('http://localhost:5000/upload', {
+		method: 'POST',
+		body: formData,
+	  })
+		.then(response => {
+		  if (!response.ok) {
+			throw new Error('Failed to send G-code to Flask app');
+		  }
+		  return response.json();
+		})
+		.then(data => {
+		  console.log('G-code successfully sent:', data);
+		})
+		.catch(error => {
+		  console.error('Error:', error);
+		});
+	}
+  
 	// Receive live G-code updates from DrawingArea
 	function handleGCodeUpdated(event) {
 	  gcode = event.detail.gcode;
@@ -64,7 +88,7 @@
 	  display: flex;
 	  flex-direction: column;
 	  align-items: center;
-	  padding: 16px; /* Added padding */
+	  padding: 16px;
 	}
 	.controls {
 	  display: flex;
@@ -114,6 +138,7 @@
 		on:undo={handleUndo}
 		on:erase={handleErase}
 		on:downloadGCode={handleDownloadGCode}
+		on:sendToFlask={handleSendToFlask}
 		eraseMode={$eraseMode}
 	  />
 	  <div class="slider-container" title="Adjust Line Thickness">
