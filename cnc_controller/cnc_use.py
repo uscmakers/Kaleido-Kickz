@@ -2,11 +2,17 @@ import subprocess
 import threading
 import time
 import os
+import RPi.GPIO as GPIO
 
-# function to create a G-code file for calibraiton 
+
+GPIO.setmode(GPIO.BCM)
+SWITCH_PIN = 16
+DEBOUNCE_TIME_MS = 200
+
+GPIO.setup(SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# create a G-code file for calibration
 def generate_gcode(filename="generated.gcode"):
-
-
     gcode_commands = [
         "G21", 
         "G90",  
@@ -22,42 +28,43 @@ def generate_gcode(filename="generated.gcode"):
 
     print(f"G-code file '{filename}' created.")
 
-
-def monitor_limit_switches():
-    while process.poll() is None:  # runs while pycnc is active
-       
-        limit_triggered = check_limit_switch()
-        if limit_triggered:
-            print("⚠️ Limit switch triggered! Stopping CNC operation.")
-            process.terminate()  # terminate pycnc subprocess
-            break
-        time.sleep(0.1)  
-
-
+# check if the limit switch is triggered
 def check_limit_switch():
-  
-    return False 
+    return GPIO.input(SWITCH_PIN) == GPIO.LOW  # LOW means the switch is pressed
+
+# monitor the limit switch
+def monitor_limit_switches():
+    while process.poll() is None:  
+        if check_limit_switch():
+            print(" Limit switch triggered! Stopping CNC operation.")
+            process.terminate() 
+            break
+        time.sleep(0.1)
+
 
 def main():
-    generate_gcode("generated.gcode")  
-
+    generate_gcode("generated.gcode") 
     global process  
     process = subprocess.Popen(
         ["pycnc", "generated.gcode"],  
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
 
-   
+    # start limit switch monitoring in a separate thread
     monitor_thread = threading.Thread(target=monitor_limit_switches, daemon=True)
     monitor_thread.start()
 
+    # read CNC process output
     for line in process.stdout:
-        print(line.strip()) 
-
+        print(line.strip())
 
     process.wait()
     monitor_thread.join()
-    print("✅ CNC Operation Completed.")
+    print("CNC Operation Completed.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nProcess interrupted. Cleaning up GPIO...")
+        GPIO.cleanup()
