@@ -42,6 +42,30 @@
 	  document.body.removeChild(link);
 	  URL.revokeObjectURL(url);
 	}
+
+	function handleUploadGCode() {
+		const gcodeString = gcode; // however your G-code is stored
+
+		const blob = new Blob([gcodeString], { type: 'text/plain' });
+		const file = new File([blob], 'drawing.txt', { type: 'text/plain' });
+
+		const formData = new FormData();
+		formData.append('file', file);
+
+		fetch('/upload', {
+			method: 'POST',
+			body: formData
+		})
+		.then(response => response.json())
+		.then(result => {
+			alert(result.message || 'Upload complete');
+			console.log('Success:', result);
+		})
+		.catch(error => {
+			alert('Upload failed');
+			console.error('Error:', error);
+		});
+	}
   
 	function handleSendToFlask() {
 	  // Send G-code to Flask app
@@ -137,7 +161,7 @@
 	  <Toolbar
 		on:undo={handleUndo}
 		on:erase={handleErase}
-		on:downloadGCode={handleDownloadGCode}
+		on:downloadGCode={handleUploadGCode}
 		on:sendToFlask={handleSendToFlask}
 		eraseMode={$eraseMode}
 	  />
