@@ -68,28 +68,29 @@
 	}
   
 	function handleSendToFlask() {
-	  // Send G-code to Flask app
-	  const formData = new FormData();
-	  const blob = new Blob([gcode], { type: 'text/plain' });
-	  formData.append('file', blob, 'drawing.gcode');
-  
-	  fetch('http://localhost:5000/upload', {
-		method: 'POST',
-		body: formData,
-	  })
-		.then(response => {
-		  if (!response.ok) {
-			throw new Error('Failed to send G-code to Flask app');
-		  }
-		  return response.json();
-		})
-		.then(data => {
-		  console.log('G-code successfully sent:', data);
-		})
-		.catch(error => {
-		  console.error('Error:', error);
-		});
-	}
+  const formData = new FormData();
+  const blob = new Blob([gcode], { type: 'text/plain' });
+  formData.append('file', blob, 'drawing.txt');
+
+  fetch('http://192.168.2.2:5000/upload', {
+    method: 'POST',
+    body: formData,
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to send G-code to Flask app');
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('✅ G-code successfully sent:', data);
+      alert('✅ G-code uploaded to Raspberry Pi');
+    })
+    .catch(error => {
+      console.error('❌ Upload failed:', error);
+      alert('❌ Upload failed — check network or Flask server');
+    });
+}
   
 	// Receive live G-code updates from DrawingArea
 	function handleGCodeUpdated(event) {
@@ -161,7 +162,7 @@
 	  <Toolbar
 		on:undo={handleUndo}
 		on:erase={handleErase}
-		on:downloadGCode={handleUploadGCode}
+		on:uploadGCode={handleUploadGCode}
 		on:sendToFlask={handleSendToFlask}
 		eraseMode={$eraseMode}
 	  />

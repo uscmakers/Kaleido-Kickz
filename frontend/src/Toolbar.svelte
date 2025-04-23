@@ -14,7 +14,7 @@
   }
 
   function handleDownload() {
-    dispatch('downloadGCode');
+    dispatch('uploadGCode');
     
   }
 
