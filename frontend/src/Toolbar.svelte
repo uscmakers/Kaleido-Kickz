@@ -41,6 +41,5 @@
   <button on:click={handleErase} title={eraseMode ? 'Disable Erase Mode' : 'Enable Erase Mode'}>
     {eraseMode ? 'Erase Mode On' : 'Erase Mode Off'}
   </button>
-  <button on:click={handleDownload} title="Upload the G-code file">Download G-code</button>
   <button on:click={handleSendToFlask} title="Send the G-code to Flask app">Send to Flask</button>
 </div>

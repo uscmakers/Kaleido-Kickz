@@ -1,11 +1,9 @@
 <script>
 	import DrawingArea from './DrawingArea.svelte';
-	import ColorSwatch from './ColorSwatch.svelte';
 	import Toolbar from './Toolbar.svelte';
 	import { writable } from 'svelte/store';
   
-	let selectedColor = 'black';
-	let strokeWidth = 2;
+	const selectedColor = 'black'
 	let drawingAreaRef;
   
 	// Store for erase mode status
@@ -16,10 +14,6 @@
   
 	// Reference to the G-code display element
 	let gcodeDisplay;
-  
-	function handleColorSelected(event) {
-	  selectedColor = event.detail.color;
-	}
   
 	function handleUndo() {
 	  drawingAreaRef.undo();
@@ -142,48 +136,23 @@
 	  white-space: pre-wrap;
 	  word-wrap: break-word;
 	}
-	.slider-container {
-	  display: flex;
-	  align-items: center;
-	  gap: 8px;
-	}
-	.slider-container label {
-	  white-space: nowrap;
-	}
-	.slider-container input {
-	  width: 150px;
-	}
   </style>
   
   <div class="app">
-	<ColorSwatch on:colorSelected={handleColorSelected} />
   
 	<div class="controls">
-	  <Toolbar
+		<Toolbar
 		on:undo={handleUndo}
 		on:erase={handleErase}
-		on:uploadGCode={handleUploadGCode}
 		on:sendToFlask={handleSendToFlask}
 		eraseMode={$eraseMode}
 	  />
-	  <div class="slider-container" title="Adjust Line Thickness">
-		<label for="strokeWidth">Line Thickness:</label>
-		<input
-		  type="range"
-		  id="strokeWidth"
-		  min="1"
-		  max="10"
-		  bind:value={strokeWidth}
-		/>
-		<span>{strokeWidth}</span>
-	  </div>
 	</div>
   
 	<div class="main-content">
 	  <DrawingArea
 		bind:this={drawingAreaRef}
 		{selectedColor}
-		{strokeWidth}
 		eraseMode={$eraseMode}
 		on:gcodeUpdated={handleGCodeUpdated}
 	  />

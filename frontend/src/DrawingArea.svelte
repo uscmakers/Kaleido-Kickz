@@ -154,37 +154,96 @@
     }
   }
 
-  // Generate G-code
+  // function updateGCode() {
+  //   let gcodeLines = [];
+
+  //   // Initial G-code commands
+  //   gcodeLines.push('G21 ; Set units to millimeters');
+  //   gcodeLines.push('G90 ; Use absolute positioning');
+  //   gcodeLines.push('G28 ; Home all axes');
+
+  //   for (const path of paths) {
+  //     if (path.points.length < 1) continue;
+
+  //     const start = path.points[0];
+  //     gcodeLines.push(`G0 X${start.x.toFixed(2)} Y${start.y.toFixed(2)} ; Rapid move to start`);
+
+  //     // Begin cutting
+  //     gcodeLines.push('G1 Z-1.00 F100 ; Move down to cutting depth');
+
+  //     for (const point of path.points.slice(1)) {
+  //       gcodeLines.push(`G1 X${point.x.toFixed(2)} Y${point.y.toFixed(2)} F300 ; Cutting move`);
+  //     }
+
+  //     // Retract
+  //     gcodeLines.push('G1 Z5.00 F100 ; Retract');
+  //   }
+
+  //   gcodeLines.push('M30 ; End of program');
+
+  //   const gcode = gcodeLines.join('\n');
+  //   dispatch('gcodeUpdated', { gcode });
+  // }
+
   function updateGCode() {
-    let gcodeLines = [];
-
-    // Initial G-code commands
-    gcodeLines.push('G21 ; Set units to millimeters');
-    gcodeLines.push('G90 ; Use absolute positioning');
-    gcodeLines.push('G28 ; Home all axes');
-
-    for (const path of paths) {
-      if (path.points.length < 1) continue;
-
-      const start = path.points[0];
-      gcodeLines.push(`G0 X${start.x.toFixed(2)} Y${start.y.toFixed(2)} ; Rapid move to start`);
-
-      // Begin cutting
-      gcodeLines.push('G1 Z-1.00 F100 ; Move down to cutting depth');
-
-      for (const point of path.points.slice(1)) {
-        gcodeLines.push(`G1 X${point.x.toFixed(2)} Y${point.y.toFixed(2)} F300 ; Cutting move`);
-      }
-
-      // Retract
-      gcodeLines.push('G1 Z5.00 F100 ; Retract');
+  let gcodeLines = [];
+  
+  // Initial G-code commands
+  gcodeLines.push('G21 ; Set units to millimeters');
+  gcodeLines.push('G90 ; Use absolute positioning');
+  gcodeLines.push('G28 ; Home all axes');
+  
+  // Calculate scaling factors
+  const xMax = 100; // New max X
+  const yMax = 60;  // New max Y (updated from 6 to 60)
+  
+  // Find current min/max values to determine scaling
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  
+  for (const path of paths) {
+    for (const point of path.points) {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
     }
-
-    gcodeLines.push('M30 ; End of program');
-
-    const gcode = gcodeLines.join('\n');
-    dispatch('gcodeUpdated', { gcode });
   }
+  
+  // Calculate scaling factors
+  const xScale = maxX > minX ? xMax / (maxX - minX) : 1;
+  const yScale = maxY > minY ? yMax / (maxY - minY) : 1;
+  
+  for (const path of paths) {
+    if (path.points.length < 1) continue;
+    
+    // Scale the starting point
+    const startOriginal = path.points[0];
+    const startX = ((startOriginal.x - minX) * xScale).toFixed(2);
+    const startY = ((startOriginal.y - minY) * yScale).toFixed(2);
+    
+    gcodeLines.push(`G0 X${startX} Y${startY} ; Rapid move to start`);
+    
+    // Begin cutting
+    gcodeLines.push('G1 Z-1.00 F100 ; Move down to cutting depth');
+    
+    for (const point of path.points.slice(1)) {
+      // Scale each point
+      const scaledX = ((point.x - minX) * xScale).toFixed(2);
+      const scaledY = ((point.y - minY) * yScale).toFixed(2);
+      
+      gcodeLines.push(`G1 X${scaledX} Y${scaledY} F300 ; Cutting move`);
+    }
+    
+    // Retract
+    gcodeLines.push('G1 Z5.00 F100 ; Retract');
+  }
+  
+  gcodeLines.push('M30 ; End of program');
+  
+  const gcode = gcodeLines.join('\n');
+  dispatch('gcodeUpdated', { gcode });
+}
 
   // Improved hit detection
   function getPathAtCoordinates(x, y) {
