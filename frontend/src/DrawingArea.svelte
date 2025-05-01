@@ -1,9 +1,9 @@
 <script>
   import { onMount, createEventDispatcher } from 'svelte';
 
-  export let selectedColor = 'black';
-  export let strokeWidth = 2;
-  export let eraseMode = false; // Now a regular prop
+  export let selectedColor = 'white';
+  export let strokeWidth = 4; // Thicker by default
+  export let eraseMode = false;
 
   const dispatch = createEventDispatcher();
 
@@ -11,16 +11,14 @@
   let ctx;
 
   let drawing = false;
-  let paths = []; // Store all drawn paths
+  let paths = [];
   let currentPath = null;
-
-  let hoverPathIndex = null; // Index of the path currently hovered over
+  let hoverPathIndex = null;
 
   onMount(() => {
     ctx = canvas.getContext('2d');
     resizeCanvas();
     redrawCanvas();
-
     window.addEventListener('resize', resizeCanvas);
   });
 
@@ -28,14 +26,15 @@
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     redrawCanvas();
-    updateGCode(); // Update G-code after resizing
+    updateGCode();
   }
 
   function getCanvasCoordinates(event) {
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    return { x, y };
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
   }
 
   function handleMouseDown(event) {
@@ -90,20 +89,31 @@
     }
   }
 
+  function jitter(value, amount = 1) {
+    return value + (Math.random() - 0.5) * amount;
+  }
+
   function drawPathSegment(path) {
     const points = path.points;
     const len = points.length;
     if (len < 2) return;
 
+    ctx.save();
+
     ctx.strokeStyle = path.color;
-    ctx.lineWidth = path.width;
+    ctx.lineWidth = path.width * 2; // Thick!
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.85;
+    ctx.shadowBlur = 1.5;
+    ctx.shadowColor = path.color;
 
     ctx.beginPath();
-    ctx.moveTo(points[len - 2].x, points[len - 2].y);
-    ctx.lineTo(points[len - 1].x, points[len - 1].y);
+    ctx.moveTo(jitter(points[len - 2].x), jitter(points[len - 2].y));
+    ctx.lineTo(jitter(points[len - 1].x), jitter(points[len - 1].y));
     ctx.stroke();
+
+    ctx.restore();
   }
 
   function redrawCanvas() {
@@ -121,31 +131,24 @@
 
     ctx.save();
 
-    if (isHovered) {
-      // Apply shadow or outline to highlight the path
-      ctx.strokeStyle = path.color;
-      ctx.lineWidth = path.width;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 10;
-    } else {
-      ctx.strokeStyle = path.color;
-      ctx.lineWidth = path.width;
-    }
-
+    ctx.strokeStyle = eraseMode ? '#1c1c1c' : path.color;
+    ctx.lineWidth = path.width * 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.85;
+    ctx.shadowBlur = isHovered ? 4 : 1.5;
+    ctx.shadowColor = path.color;
 
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+    ctx.moveTo(jitter(points[0].x), jitter(points[0].y));
     for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y);
+      ctx.lineTo(jitter(points[i].x), jitter(points[i].y));
     }
     ctx.stroke();
 
     ctx.restore();
   }
 
-  // Undo functionality
   export function undo() {
     if (paths.length > 0) {
       paths.pop();
@@ -154,100 +157,58 @@
     }
   }
 
-  // function updateGCode() {
-  //   let gcodeLines = [];
-
-  //   // Initial G-code commands
-  //   gcodeLines.push('G21 ; Set units to millimeters');
-  //   gcodeLines.push('G90 ; Use absolute positioning');
-  //   gcodeLines.push('G28 ; Home all axes');
-
-  //   for (const path of paths) {
-  //     if (path.points.length < 1) continue;
-
-  //     const start = path.points[0];
-  //     gcodeLines.push(`G0 X${start.x.toFixed(2)} Y${start.y.toFixed(2)} ; Rapid move to start`);
-
-  //     // Begin cutting
-  //     gcodeLines.push('G1 Z-1.00 F100 ; Move down to cutting depth');
-
-  //     for (const point of path.points.slice(1)) {
-  //       gcodeLines.push(`G1 X${point.x.toFixed(2)} Y${point.y.toFixed(2)} F300 ; Cutting move`);
-  //     }
-
-  //     // Retract
-  //     gcodeLines.push('G1 Z5.00 F100 ; Retract');
-  //   }
-
-  //   gcodeLines.push('M30 ; End of program');
-
-  //   const gcode = gcodeLines.join('\n');
-  //   dispatch('gcodeUpdated', { gcode });
-  // }
-
   function updateGCode() {
-  let gcodeLines = [];
-  
-  // Initial G-code commands
-  gcodeLines.push('G21 ; Set units to millimeters');
-  gcodeLines.push('G90 ; Use absolute positioning');
-  gcodeLines.push('G28 ; Home all axes');
-  
-  // Calculate scaling factors
-  const xMax = 100; // New max X
-  const yMax = 60;  // New max Y (updated from 6 to 60)
-  
-  // Find current min/max values to determine scaling
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  
-  for (const path of paths) {
-    for (const point of path.points) {
-      minX = Math.min(minX, point.x);
-      maxX = Math.max(maxX, point.x);
-      minY = Math.min(minY, point.y);
-      maxY = Math.max(maxY, point.y);
-    }
-  }
-  
-  // Calculate scaling factors
-  const xScale = maxX > minX ? xMax / (maxX - minX) : 1;
-  const yScale = maxY > minY ? yMax / (maxY - minY) : 1;
-  
-  for (const path of paths) {
-    if (path.points.length < 1) continue;
-    
-    // Scale the starting point
-    const startOriginal = path.points[0];
-    const startX = ((startOriginal.x - minX) * xScale).toFixed(2);
-    const startY = ((startOriginal.y - minY) * yScale).toFixed(2);
-    
-    gcodeLines.push(`G0 X${startX} Y${startY} ; Rapid move to start`);
-    
-    // Begin cutting
-    gcodeLines.push('G1 Z-1.00 F100 ; Move down to cutting depth');
-    
-    for (const point of path.points.slice(1)) {
-      // Scale each point
-      const scaledX = ((point.x - minX) * xScale).toFixed(2);
-      const scaledY = ((point.y - minY) * yScale).toFixed(2);
-      
-      gcodeLines.push(`G1 X${scaledX} Y${scaledY} F300 ; Cutting move`);
-    }
-    
-    // Retract
-    gcodeLines.push('G1 Z5.00 F100 ; Retract');
-  }
-  
-  gcodeLines.push('M30 ; End of program');
-  
-  const gcode = gcodeLines.join('\n');
-  dispatch('gcodeUpdated', { gcode });
-}
+    let gcodeLines = [];
 
-  // Improved hit detection
+    gcodeLines.push('G21 ; Set units to millimeters');
+    gcodeLines.push('G90 ; Use absolute positioning');
+    gcodeLines.push('G28 ; Home all axes');
+
+    const xMax = 100;
+    const yMax = 60;
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (const path of paths) {
+      for (const point of path.points) {
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x);
+        minY = Math.min(minY, point.y);
+        maxY = Math.max(maxY, point.y);
+      }
+    }
+
+    const xScale = maxX > minX ? xMax / (maxX - minX) : 1;
+    const yScale = maxY > minY ? yMax / (maxY - minY) : 1;
+
+    for (const path of paths) {
+      if (path.points.length < 1) continue;
+
+      const start = path.points[0];
+      const startX = ((start.x - minX) * xScale).toFixed(2);
+      const startY = ((start.y - minY) * yScale).toFixed(2);
+
+      gcodeLines.push(`G0 X${startX} Y${startY} ; Rapid move to start`);
+      gcodeLines.push('G1 Z-1.00 F100 ; Move down to cutting depth');
+
+      for (const point of path.points.slice(1)) {
+        const scaledX = ((point.x - minX) * xScale).toFixed(2);
+        const scaledY = ((point.y - minY) * yScale).toFixed(2);
+        gcodeLines.push(`G1 X${scaledX} Y${scaledY} F300 ; Cutting move`);
+      }
+
+      gcodeLines.push('G1 Z5.00 F100 ; Retract');
+    }
+
+    gcodeLines.push('M30 ; End of program');
+
+    const gcode = gcodeLines.join('\n');
+    dispatch('gcodeUpdated', { gcode });
+  }
+
   function getPathAtCoordinates(x, y) {
-    const threshold = 10; // Adjust as needed
+    const threshold = 10;
     for (let i = paths.length - 1; i >= 0; i--) {
       const path = paths[i];
       const points = path.points;
@@ -280,22 +241,29 @@
 
 <style>
   .drawing-area {
-    border: 1px solid #ccc;
+    border: 1px solid #333;
     touch-action: none;
-    background-color: white;
+    background-image: url('/chalkboard.png');
+    background-size: cover;
+    background-position: center;
     width: 800px;
     height: 500px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
   }
+
   canvas {
     display: block;
     width: 100%;
     height: 100%;
   }
+
   .erase-mode {
     cursor: crosshair;
   }
+
   .drawing-mode {
-    cursor: crosshair; /* Replace with paintbrush cursor if available */
+    cursor: crosshair;
   }
 </style>
 
